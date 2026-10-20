@@ -8,6 +8,7 @@ import sys
 
 import anthropic
 
+from agent.claude_code import ClaudeCodeAgent
 from agent.client import make_client
 from agent.loop import MODEL, LockerAgent
 from pipeline.common import connect
@@ -21,7 +22,8 @@ def _trace(kind: str, payload: dict) -> None:
     elif kind == "tool_result":
         status = "ERROR" if payload["is_error"] else "ok"
         first = payload["output"].splitlines()[0][:120] if payload["output"] else ""
-        print(f"  ← {status} in {payload['ms']} ms: {first}", file=sys.stderr)
+        timing = f" in {payload['ms']} ms" if payload.get("ms") else ""
+        print(f"  ← {status}{timing}: {first}", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,11 +32,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m agent", description=__doc__)
     parser.add_argument("question", nargs="*", help="the question; prompted for if omitted")
     parser.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh", "max"])
-    parser.add_argument("--model", default=MODEL)
+    parser.add_argument("--backend", default="claude-code", choices=["claude-code", "api"],
+                        help="claude-code: headless Claude Code on your Claude subscription (no API credits); "
+                             "api: the Anthropic API loop (needs credits)")
+    parser.add_argument("--model", default=None, help=f"default: opus (claude-code) or {MODEL} (api)")
     parser.add_argument("--quiet", action="store_true", help="hide the tool trace")
     args = parser.parse_args(argv)
     question = " ".join(args.question).strip() or input("Question: ").strip()
-    agent = LockerAgent(make_client(), connect(read_only=True), model=args.model, effort=args.effort)
+    if args.backend == "api":
+        agent = LockerAgent(make_client(), connect(read_only=True), model=args.model or MODEL, effort=args.effort)
+    else:
+        agent = ClaudeCodeAgent(model=args.model or "opus", effort=args.effort)
     try:
         result = agent.ask(question, on_event=None if args.quiet else _trace)
     except anthropic.AuthenticationError:

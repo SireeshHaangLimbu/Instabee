@@ -8,3 +8,4 @@ data/*.duckdb.wal
 
 outputs/
 runs/
+.mcp.json

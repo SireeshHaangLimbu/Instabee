@@ -28,6 +28,17 @@ class AgentResult:
     usage: dict = field(default_factory=dict)
     seconds: float = 0.0
     model: str = MODEL
+    extra: dict = field(default_factory=dict)
+
+
+def log_result(result: AgentResult, path: Path | None = LOG_PATH) -> None:
+    """Append one JSON line per run, so any answer can be replayed and audited."""
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {"timestamp": dt.datetime.now().isoformat(timespec="seconds"), **asdict(result)}
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
 
 
 def _text(content) -> str:
@@ -98,13 +109,5 @@ class LockerAgent:
             result.answer = f"Stopped after {self.max_turns} model turns without a final answer."
         result.seconds = round(time.time() - started, 1)
         emit("answer", {"text": result.answer})
-        self._log(result)
+        log_result(result, self.log_path)
         return result
-
-    def _log(self, result: AgentResult) -> None:
-        if self.log_path is None:
-            return
-        self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        record = {"timestamp": dt.datetime.now().isoformat(timespec="seconds"), **asdict(result)}
-        with self.log_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")

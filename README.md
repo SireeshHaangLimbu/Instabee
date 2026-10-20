@@ -15,12 +15,17 @@ py -3.11 -m venv .venv
 .venv/Scripts/python -m pytest                  # offline tests
 ```
 
-Put your key in `.env`:
+## Two ways to run the model
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
-# only for user-scoped keys (sk-ant-usr-...):
-ANTHROPIC_WORKSPACE_ID=wrkspc_...
+The tools are served two ways; the prompt, tools and answers are the same.
+
+| Backend | Model access | Needs |
+|---|---|---|
+| `claude-code` (default) | Headless Claude Code with the `instabee-lockers` MCP server | Claude Code signed in with a Claude subscription; **no API credits** |
+| `api` | Anthropic API tool-use loop (`agent/loop.py`) | `ANTHROPIC_API_KEY` with credits in `.env` (plus `ANTHROPIC_WORKSPACE_ID` for a user-scoped key) |
+
+```bash
+.venv/Scripts/python scripts/setup_mcp.py      # writes .mcp.json (machine-specific paths)
 ```
 
 ## Use
@@ -28,11 +33,15 @@ ANTHROPIC_WORKSPACE_ID=wrkspc_...
 ```bash
 .venv/Scripts/python -m agent "Where should Instabox put its next 10 lockers in Uppsala?"
 .venv/Scripts/python -m agent --effort high "Which cities over 50,000 people are least covered by lockers?"
-.venv/Scripts/python -m evals.run_evals         # 8 graded questions
+.venv/Scripts/python -m agent --backend api "..."   # Anthropic API instead
+.venv/Scripts/python -m evals.run_evals             # 8 graded questions
 ```
 
+**Interactive demo:** open a new Claude Code session in this folder, approve the `instabee-lockers` MCP server,
+and ask a locker question in the chat. The `locker-analyst` skill (`.claude/skills/`) applies the same answer rules.
+
 Or open `locker_agent.ipynb` (`pip install -r requirements-notebook.txt`, then `jupyter lab`). Part 2 of the
-notebook runs the tools without the model or an API key.
+notebook runs the tools without any model.
 
 Every run is logged to `runs/agent_runs.jsonl` (question, each tool call with input and output, answer, tokens).
 Maps are written to `outputs/`.
