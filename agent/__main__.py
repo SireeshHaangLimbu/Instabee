@@ -41,8 +41,9 @@ def main(argv: list[str] | None = None) -> int:
         print("Authentication failed: check ANTHROPIC_API_KEY in .env.", file=sys.stderr)
         return 2
     except anthropic.BadRequestError as exc:
-        hint = (" Add ANTHROPIC_WORKSPACE_ID=<id> to .env or use a workspace-scoped key."
-                if "workspace" in str(exc).lower() else "")
+        text = str(exc).lower()
+        hint = (" Add ANTHROPIC_WORKSPACE_ID=<id> to .env or use a workspace-scoped key." if "workspace" in text else
+                " Add credits under Plans & Billing in the Anthropic Console." if "credit balance" in text else "")
         print(f"Request rejected: {exc.message}.{hint}", file=sys.stderr)
         return 2
     print("\n" + result.answer)
