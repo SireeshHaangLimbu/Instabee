@@ -93,8 +93,12 @@ def _plain(value: Any) -> Any:
 def _table(df: pd.DataFrame, rows: int = TABLE_ROWS) -> str:
     shown = df.head(rows).copy()
     for col in shown.columns:
-        if shown[col].dtype == object and shown[col].map(lambda v: isinstance(v, (bytes, bytearray))).any():
+        if pd.api.types.is_numeric_dtype(shown[col]):
+            continue
+        if shown[col].map(lambda v: isinstance(v, (bytes, bytearray))).any():
             shown[col] = "<geometry>"
+        else:
+            shown[col] = shown[col].astype(object).where(shown[col].notna(), "")
     text = shown.to_markdown(index=False)
     return text + (f"\n({len(df)} rows, first {rows} shown)" if len(df) > rows else "")
 
