@@ -1,0 +1,463 @@
+<title>Locker Placement Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a planning desk. Question and answer on the left, the municipality map and a no-AI calculator on the right. */
+:root {
+  --bg: #f3f5f6;
+  --panel: #ffffff;
+  --fg: #142029;
+  --muted: #5a6a76;
+  --line: #cfd8de;
+  --model: #0d6a87;          /* covered homes, Instabee, Claude */
+  --call: #c9711e;           /* gaps, proposed sites, tool calls */
+  --model-soft: #e2eff3;
+  --call-soft: #f8ebdd;
+  --bad: #b3261e;
+  --display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151a; --panel: #151f26; --fg: #e5ecf0; --muted: #93a3ae; --line: #2c3a44;
+    --model: #57b9d8; --call: #f0a250; --model-soft: #12313c; --call-soft: #3a2a19; --bad: #f2867d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151a; --panel: #151f26; --fg: #e5ecf0; --muted: #93a3ae; --line: #2c3a44;
+  --model: #57b9d8; --call: #f0a250; --model-soft: #12313c; --call-soft: #3a2a19; --bad: #f2867d; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap {
+  max-width: 1240px; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 22px;
+}
+header { display: grid; gap: 6px; }
+.label { font-family: var(--mono); font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 4vw, 40px); line-height: 1.08; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 17px; margin: 0; }
+.lede { margin: 0; max-width: 72ch; color: var(--muted); }
+.lede b { color: var(--fg); font-weight: 600; }
+
+.desk { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .desk { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+
+/* ask */
+.askrow { display: grid; gap: 10px; }
+textarea {
+  width: 100%; min-height: 76px; resize: vertical; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+}
+textarea:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--model); outline-offset: 2px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+button {
+  font: inherit; font-weight: 600; border-radius: 8px; padding: 8px 16px; cursor: pointer;
+  border: 1px solid var(--model); background: var(--model); color: var(--panel);
+}
+button.ghost { background: transparent; color: var(--fg); border-color: var(--line); font-weight: 500; }
+button:disabled { opacity: .5; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 13px; font-weight: 500; padding: 5px 10px; border-radius: 999px; background: var(--model-soft); color: var(--fg); border: 1px solid transparent; }
+.status { font-size: 13px; color: var(--muted); }
+.status.err { color: var(--bad); }
+
+.answer { min-height: 120px; font-size: 15px; overflow-wrap: anywhere; }
+.answer.empty { color: var(--muted); }
+.answer h1, .answer h2, .answer h3 { font-family: var(--display); font-size: 17px; margin: 14px 0 6px; }
+.answer p { margin: 8px 0; max-width: 75ch; }
+.answer ul, .answer ol { padding-left: 20px; margin: 8px 0; }
+.answer code { font-family: var(--mono); font-size: .9em; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; width: 100%; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+
+.trace { display: grid; gap: 4px; font-family: var(--mono); font-size: 12px; }
+.trace .row { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 8px; color: var(--muted); }
+.trace .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; background: var(--call); }
+.trace .row.done .dot { background: var(--model); }
+.trace .row.fail .dot { background: var(--bad); }
+.trace .name { color: var(--fg); }
+details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+
+/* map */
+.mapbox { position: relative; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); aspect-ratio: 4 / 3.4; max-width: 100%; overflow: hidden; }
+canvas { width: 100%; height: 100%; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.maptitle { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+
+/* calculator */
+form.calc { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: end; }
+@media (max-width: 560px) { form.calc { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+form.calc label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+select, input[type="number"] {
+  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; width: 100%; min-width: 0;
+}
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.kpi { border-top: 2px solid var(--line); padding-top: 6px; display: grid; gap: 2px; }
+.kpi b { font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
+.kpi.up b { color: var(--model); }
+.kpi span { font-size: 12px; color: var(--muted); }
+
+footer { display: grid; gap: 10px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+footer ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+footer a { color: var(--model); }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="label">Public-data prototype · Swedish parcel lockers</span>
+    <h1>Locker Placement Desk</h1>
+    <p class="lede">Ask where new Instabox and Budbee lockers should go. Claude reads the question and calls planning tools that run
+      <b>in this page</b> on OpenStreetMap, SCB and Overture data for all of Sweden. Every number comes from those tools.</p>
+  </header>
+
+  <div class="desk">
+    <section class="panel" aria-labelledby="ask-h">
+      <h2 id="ask-h">Ask the agent</h2>
+      <div class="askrow">
+        <textarea id="q" aria-label="Your question">Where should Instabox put its next 10 lockers in Uppsala?</textarea>
+        <div class="btns">
+          <button id="ask" type="button">Ask Claude</button>
+          <button id="stop" type="button" class="ghost" hidden>Stop</button>
+          <span id="status" class="status" role="status"></span>
+        </div>
+        <div class="chips" id="chips" aria-label="Example questions"></div>
+      </div>
+      <div id="answer" class="answer empty">Claude's answer appears here. Answers use your own Claude account and usually take 30–90 seconds, because Claude runs several tools before writing.</div>
+      <details id="tracebox">
+        <summary>Tools Claude used (<span id="tracecount">0</span>)</summary>
+        <div class="trace" id="trace"></div>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="map-h">
+      <div class="maptitle">
+        <h2 id="map-h">Map: <span id="maparea">Uppsala</span></h2>
+        <span class="label" id="mapnote">Instabee · 500 m</span>
+      </div>
+      <div class="mapbox"><canvas id="map" role="img" aria-label="Map of homes covered and not covered by lockers, with proposed sites"></canvas></div>
+      <div class="legend">
+        <span><i class="sw" style="background: var(--model)"></i>homes within reach</span>
+        <span><i class="sw" style="background: var(--call)"></i>homes outside reach</span>
+        <span><i class="sw" style="background: var(--fg)"></i>Instabee locker</span>
+        <span><i class="sw" style="border: 1.5px solid var(--muted)"></i>other locker</span>
+        <span><i class="sw" style="background: var(--call); outline: 2px solid var(--panel)"></i>proposed site (numbered)</span>
+      </div>
+
+      <h2>Calculator, no AI needed</h2>
+      <form class="calc" id="calc">
+        <label for="c-area">Municipality<select id="c-area"></select></label>
+        <label for="c-n">New lockers<input id="c-n" type="number" min="1" max="50" value="10"></label>
+        <label for="c-r">Walk radius (m)<select id="c-r"><option>300</option><option selected>500</option><option>800</option><option>1000</option></select></label>
+        <label for="c-net">Network<select id="c-net"><option value="Instabee">Instabee</option><option value="PostNord">PostNord</option><option value="any">Any network</option></select></label>
+      </form>
+      <div class="kpis" id="kpis">
+        <div class="kpi"><b>…</b><span>covered today</span></div>
+        <div class="kpi up"><b>…</b><span>after new lockers</span></div>
+        <div class="kpi"><b>…</b><span>more residents reached</span></div>
+      </div>
+      <div class="tablewrap"><table id="sites"><thead><tr><th>#</th><th>Site</th><th>Type</th><th>+ residents</th><th>Coverage</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+
+  <footer>
+    <strong>Data and method</strong>
+    <ul>
+      <li>Lockers: OpenStreetMap (snapshot 2026-10-20). It maps 377 Instabee lockers, only part of the real network, so Instabee coverage here is a lower bound.</li>
+      <li>Residents: SCB 1 km population grid 2025, spread over Overture building footprints into ~175 m hexagons. Areas: SCB DeSO 2025.</li>
+      <li>Host sites: Overture Places 2026-09-23 (supermarkets, petrol stations, pharmacies, convenience stores, malls).</li>
+      <li>Parcel volumes and seasonality: <a href="https://via.tt.se/files/3235972/4535013/411099/sv">Paketindex Q2 2026</a>, Transportföretagen.</li>
+      <li>Placement uses greedy maximal covering on uncovered, age-weighted residents within a straight-line radius. Demand figures are estimates.</li>
+    </ul>
+    <span>A study prototype built on public data; not an Instabee product. Map data © OpenStreetMap contributors (ODbL).</span>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script src="tools.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const loader = {
+    json: (name) => fetch("data/" + name).then((r) => { if (!r.ok) throw new Error(name + " " + r.status); return r.json(); }),
+    binary: (name) => fetch("data/" + name).then((r) => { if (!r.ok) throw new Error(name + " " + r.status); return r.text(); })
+      .then((b64) => { const bin = atob(b64.trim()), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out.buffer; }),
+  };
+  const T = LockerTools.createTools(loader);
+
+  const EXAMPLES = [
+    "Where should Instabox put its next 10 lockers in Uppsala?",
+    "Which Swedish cities over 50,000 residents are least covered by parcel lockers?",
+    "Which parts of Göteborg have the most residents without an Instabee locker within 500 m?",
+    "Which grocery chains host PostNord lockers more than Instabee ones?",
+    "How many compartments would a site with 20,000 locker parcels a year need in December?",
+    "What is the utilisation of Instabox lockers in Malmö?",
+  ];
+
+  const RULES = `You are a growth decision analyst for Instabee (Instabox and Budbee parcel lockers) in Sweden, answering a planner's question with the tools on this page. The tools compute everything from public data; you choose the tools and write the answer.
+
+How the data works
+- Residents sit in ~175 m hexagons (SCB 1 km grid 2025 spread over buildings). Distances are straight-line in metres, capped at 5,000 m.
+- Networks: Instabee = Instabox + Budbee. Competitors = every other network (PostNord, Bring, DHL, iBoxen, others).
+- Lockers come from OpenStreetMap (snapshot 2026-10-20), which holds only 377 Instabee lockers while the real network is in the thousands. Instabee coverage is therefore a lower bound and gaps are overstated. Some municipalities have no lockers mapped at all. Say this whenever an answer depends on Instabee lockers.
+- Host sites come from Overture Places and can be mislabelled; show the name and type so the reader can check them.
+- Parcel volumes, delivery mix and seasonality are national figures from Paketindex Q2 2026.
+
+How to work
+- Use the tools for every number. There is no SQL tool here; if no tool answers a question, say so.
+- Call independent tools in the same round (for example coverage and optimise_next_n together) so the answer comes quickly. Use at most three rounds of tool calls.
+- Defaults unless asked otherwise: network Instabee, radius 500 m, host types all.
+- For "where should the next N lockers go": coverage for the baseline and optimise_next_n for the sites in one round, then overlap_check on the top site.
+- If a tool returns an error, correct the call once; never guess a result.
+
+Rules for the answer
+1. State no number that did not come from a tool result. No arithmetic beyond rounding, and no hypothetical values; for a what-if, call the tool again with that parameter.
+2. Label demand, parcel and compartment figures as estimates and name their assumptions.
+3. Use place names exactly as the tools return them; flag odd ones in the caveats.
+4. If the data cannot answer (utilisation, costs, rents, host willingness, footfall), say so and name the internal Instabee data that would.
+5. Format: one or two sentences with the answer first, then a compact Markdown table, then a short "Caveats and what to verify internally" list, then one line naming the sources. Under about 300 words.`;
+
+  const NET = { type: "string", enum: ["Instabee", "PostNord", "competitors", "any"], description: "Locker network. Default Instabee." };
+  const RAD = { type: "number", description: "Straight-line radius in metres, 1-5000. Default 500." };
+  const AREA = { type: "string", description: "A Swedish municipality name such as 'Uppsala' or 'Göteborg', or 'Sweden'." };
+  const KOMMUN = { type: "string", description: "One Swedish municipality, such as 'Uppsala'." };
+  const HOSTS = { type: "array", items: { type: "string", enum: LockerTools.CANDIDATE_HOST_TYPES }, description: "Host types to consider. Default all." };
+  const SPECS = [
+    ["coverage", "Share of residents within the radius of a locker network in an area. With group_by 'kommun' and area 'Sweden', ranks municipalities from least to most covered, with lockers per 10,000 residents. Returns {summary, table?, notes}.",
+      { area: AREA, network: NET, radius_m: RAD, group_by: { type: "string", enum: ["kommun"] }, min_population: { type: "number", description: "With group_by, skip smaller municipalities. Default 20000." } }, ["area"]],
+    ["coverage_gaps", "DeSO statistical areas with the most residents outside the radius, with the gap's centre and the median distance to the nearest locker.",
+      { area: AREA, network: NET, radius_m: RAD, top_n: { type: "integer", description: "Rows, default 10." } }, ["area"]],
+    ["optimise_next_n", "Choose N new locker sites in one municipality that add the most uncovered, age-weighted residents (greedy maximal covering). Returns each site's added residents, estimated locker parcels and cumulative coverage.",
+      { area: KOMMUN, n: { type: "integer", description: "Sites, 1-50." }, network: NET, radius_m: RAD,
+        candidates: { type: "string", enum: ["hosts", "hexes", "both"], description: "hosts = shops and petrol stations; hexes = residential spots; default hosts." }, host_types: HOSTS }, ["area", "n"]],
+    ["score_sites", "Rank individual host sites in one municipality by uncovered residents within the radius, with nearby own and competitor lockers.",
+      { area: KOMMUN, network: NET, radius_m: RAD, host_types: HOSTS, top_n: { type: "integer", description: "Rows, default 15." } }, ["area"]],
+    ["overlap_check", "For a proposed site, how much of its catchment a network already covers (cannibalisation), the nearest network locker and other networks' lockers nearby.",
+      { lat: { type: "number" }, lon: { type: "number" }, radius_m: RAD, network: NET }, ["lat", "lon"]],
+    ["demand_estimate", "Estimated yearly e-commerce and locker parcels for an area from residents, age and national Paketindex volumes, with its assumptions.",
+      { area: AREA, locker_share: { type: "number", description: "Locker share, e.g. 0.23. Default national June 2026 figure." } }, ["area"]],
+    ["peak_sizing", "Compartments a site needs in an average month and the peak month, from yearly locker parcels, dwell days and target utilisation.",
+      { annual_locker_parcels: { type: "number" }, dwell_days: { type: "number", description: "Default 2." }, utilisation: { type: "number", description: "0-1, default 0.8." }, peak_month: { type: "string", description: "Default 'dec'." } }, ["annual_locker_parcels"]],
+    ["competitor_presence", "Lockers per network in an area, and which retail chains have each network's locker at their store (within 50 m).",
+      { area: AREA }, ["area"]],
+    ["data_sources", "Sources, licences and snapshot dates of every dataset, plus the national market figures.", {}, []],
+  ];
+
+  // ---------- trace and map hooks ----------
+  const traceEl = $("trace");
+  let traceN = 0;
+  function traceStart(name, input) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = '<i class="dot"></i><div><span class="name"></span> <span class="args"></span><div class="res"></div></div>';
+    row.querySelector(".name").textContent = name;
+    row.querySelector(".args").textContent = JSON.stringify(input);
+    traceEl.append(row);
+    $("tracecount").textContent = String(++traceN);
+    return row;
+  }
+  const summarize = (res) => res?.summary ? Object.entries(res.summary).slice(0, 6).map(([k, v]) => `${k}: ${v}`).join(" · ") : "done";
+
+  const tools = SPECS.map(([name, description, properties, required]) => ({
+    name, description,
+    inputSchema: { type: "object", properties, required },
+    async execute(input) {
+      const row = traceStart(name, input);
+      try {
+        const res = await T.tools[name](input || {});
+        row.classList.add("done");
+        row.querySelector(".res").textContent = summarize(res);
+        afterTool(name, input || {}, res);
+        return res;
+      } catch (e) {
+        row.classList.add("fail");
+        row.querySelector(".res").textContent = String(e.message || e);
+        throw e;
+      }
+    },
+  }));
+
+  function afterTool(name, input, res) {
+    if (!["coverage", "coverage_gaps", "optimise_next_n", "score_sites"].includes(name)) return;
+    let area;
+    try { area = T.resolveArea(input.area); } catch { return; }
+    if (!area.code) return;
+    const sites = name === "optimise_next_n" ? (res.table || []).map((r) => ({ name: r.name, lat: r.lat, lon: r.lon })) : null;
+    drawMap(area.name, input.network || "Instabee", input.radius_m || 500, sites);
+  }
+
+  // ---------- map ----------
+  const canvas = $("map");
+  let lastMap = null;
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  async function drawMap(areaName, network, radius, sites) {
+    const layer = await T.mapLayer(areaName, network, radius);
+    lastMap = { layer, sites: sites ?? (lastMap && lastMap.layer.area === layer.area ? lastMap.sites : []) };
+    $("maparea").textContent = layer.area;
+    $("mapnote").textContent = `${layer.network} · ${layer.radius} m`;
+    paint();
+  }
+  function paint() {
+    if (!lastMap) return;
+    const { layer, sites } = lastMap, h = layer.hexes;
+    const rect = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, rect.width * dpr); canvas.height = Math.max(1, rect.height * dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    // Fit the populated core: drop the 1% most remote hexagons so rural edges do not shrink the city.
+    const order = h.pop.map((p, i) => i).sort((a, b) => h.pop[b] - h.pop[a]);
+    const core = order.slice(0, Math.max(50, Math.floor(order.length * 0.6)));
+    const xs = core.map((i) => h.x[i]).sort((a, b) => a - b), ys = core.map((i) => h.y[i]).sort((a, b) => a - b);
+    const q = (arr, p) => arr[Math.floor((arr.length - 1) * p)];
+    let x0 = q(xs, 0.01), x1 = q(xs, 0.99), y0 = q(ys, 0.01), y1 = q(ys, 0.99);
+    const pad = 900; x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+    const s = Math.min(rect.width / (x1 - x0), rect.height / (y1 - y0));
+    const ox = (rect.width - (x1 - x0) * s) / 2, oy = (rect.height - (y1 - y0) * s) / 2;
+    const px = (x) => ox + (x - x0) * s, py = (y) => oy + (y1 - y) * s;
+    const maxPop = h.pop.reduce((m, v) => Math.max(m, v), 1);
+    const cov = css("--model"), unc = css("--call"), fg = css("--fg"), muted = css("--muted"), panel = css("--panel");
+    for (let i = 0; i < h.x.length; i++) {
+      if (h.pop[i] < 1) continue;
+      ctx.globalAlpha = 0.25 + 0.6 * Math.sqrt(h.pop[i] / maxPop);
+      ctx.fillStyle = h.d[i] <= layer.radius ? cov : unc;
+      const r = Math.max(1.2, 0.5 + 3.2 * Math.sqrt(h.pop[i] / maxPop));
+      ctx.beginPath(); ctx.arc(px(h.x[i]), py(h.y[i]), r, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (const l of layer.lockers) {
+      ctx.beginPath(); ctx.arc(px(l.x), py(l.y), 3.6, 0, 6.2832);
+      if (l.network === "Instabee") { ctx.fillStyle = fg; ctx.fill(); } else { ctx.strokeStyle = muted; ctx.lineWidth = 1.4; ctx.stroke(); }
+    }
+    (sites || []).forEach((st, i) => {
+      const p = T.toSweref(st.lat, st.lon), cx = px(p.x), cy = py(p.y);
+      ctx.beginPath(); ctx.arc(cx, cy, 9, 0, 6.2832); ctx.fillStyle = unc; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = panel; ctx.stroke();
+      ctx.fillStyle = panel; ctx.font = "600 10px IBM Plex Mono, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(i + 1), cx, cy + 0.5);
+    });
+  }
+  new ResizeObserver(() => paint()).observe(canvas);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", paint);
+  new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------- calculator ----------
+  const fmt = (n) => Number(n).toLocaleString("en-GB");
+  async function runCalc() {
+    const area = $("c-area").value, n = Math.min(50, Math.max(1, Number($("c-n").value) || 10));
+    const radius_m = Number($("c-r").value), network = $("c-net").value;
+    const kpis = $("kpis").querySelectorAll("b");
+    kpis.forEach((b) => (b.textContent = "…"));
+    try {
+      const res = await T.tools.optimise_next_n({ area, n, radius_m, network });
+      const s = res.summary;
+      kpis[0].textContent = s.pct_covered_before + "%";
+      kpis[1].textContent = s.pct_covered_after + "%";
+      kpis[2].textContent = fmt(s.new_population_covered);
+      const tb = $("sites").querySelector("tbody");
+      tb.replaceChildren(...res.table.map((r) => {
+        const tr = document.createElement("tr");
+        for (const v of [r.rank, r.name, r.host_type, fmt(r.new_population), r.cumulative_pct_covered + "%"]) {
+          const td = document.createElement("td"); td.textContent = v; tr.append(td);
+        }
+        return tr;
+      }));
+      await drawMap(area, network, radius_m, res.table.map((r) => ({ name: r.name, lat: r.lat, lon: r.lon })));
+    } catch (e) {
+      kpis.forEach((b) => (b.textContent = "–"));
+      $("sites").querySelector("tbody").replaceChildren();
+      setStatus(String(e.message || e), true);
+    }
+  }
+
+  // ---------- ask ----------
+  let sample = null, ctl = null;
+  const turns = [];
+  function setStatus(text, err = false) { const s = $("status"); s.textContent = text; s.classList.toggle("err", err); }
+  function render(md) {
+    const el = $("answer");
+    el.classList.remove("empty");
+    el.innerHTML = DOMPurify.sanitize(marked.parse(md));
+    el.querySelectorAll("table").forEach((t) => { if (!t.parentElement.classList.contains("tablewrap")) { const w = document.createElement("div"); w.className = "tablewrap"; t.replaceWith(w); w.append(t); } });
+  }
+  const COPY = {
+    not_granted: "Claude was not allowed for this page. Allow it when asked, or use the calculator.",
+    sampling_disabled: "Claude is not available for this account. The calculator still works.",
+    rate_limited: "Claude is busy or your usage limit was reached. Try again in a few minutes.",
+    session_expired: "Your Claude session expired. Sign in again and retry.",
+    tools_unavailable: "This Claude app cannot run page tools yet. Try claude.ai in a browser, or use the calculator.",
+    refused: "Claude declined this question. Try rephrasing it.",
+    prompt_too_large: "The conversation got too long. Reload the page to start fresh.",
+  };
+
+  async function ask(question) {
+    if (!sample || !question.trim()) return;
+    ctl = new AbortController();
+    $("ask").disabled = true; $("stop").hidden = false;
+    setStatus("Thinking… Claude is choosing tools.");
+    traceEl.replaceChildren(); traceN = 0; $("tracecount").textContent = "0"; $("tracebox").open = true;
+    turns.push({ role: "user", content: question });
+    const input = [{ role: "user", content: RULES }, ...turns.slice(-7)];
+    try {
+      const { text, truncated } = await sample(input, {
+        tools, signal: ctl.signal, modelTier: "default",
+        onText: ({ text }) => { setStatus("Writing the answer…"); render(text); },
+      });
+      render(text);
+      turns.push({ role: "assistant", content: text });
+      setStatus(truncated ? "The answer was cut short. Ask for less at a time." : "Done. Ask a follow-up or another question.");
+    } catch (e) {
+      turns.pop();
+      if (e.text) render(e.text);
+      setStatus(e.code === "cancelled" ? "Stopped." : COPY[e.code] || "Something went wrong reaching Claude. Try again.", e.code !== "cancelled");
+    } finally {
+      $("ask").disabled = false; $("stop").hidden = true;
+    }
+  }
+
+  // ---------- boot ----------
+  $("stop").addEventListener("click", () => ctl?.abort());
+  $("ask").addEventListener("click", () => ask($("q").value));
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ask($("q").value); });
+  for (const q of EXAMPLES) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = q;
+    b.addEventListener("click", () => { $("q").value = q; $("q").focus(); });
+    $("chips").append(b);
+  }
+  $("calc").addEventListener("change", runCalc);
+  $("calc").addEventListener("submit", (e) => { e.preventDefault(); runCalc(); });
+
+  (async () => {
+    await T.init();
+    const sel = $("c-area");
+    const list = [...T.municipalities()].sort((a, b) => a.name.localeCompare(b.name, "sv"));
+    for (const k of list) { const o = document.createElement("option"); o.value = k.name; o.textContent = k.name; sel.append(o); }
+    sel.value = "Uppsala";
+    runCalc();
+  })().catch((e) => setStatus("Could not load the data: " + (e.message || e), true));
+
+  (async () => {
+    sample = window.claude ? await window.claude.use("sample") : null;
+    if (!sample) {
+      $("ask").disabled = true;
+      setStatus("Open this page on claude.ai while signed in to ask Claude. The calculator works for everyone.");
+      return;
+    }
+    const lim = await sample.limits().catch(() => null);
+    if (!lim?.tools) { $("ask").disabled = true; setStatus(COPY.tools_unavailable); }
+  })();
+})();
+</script>

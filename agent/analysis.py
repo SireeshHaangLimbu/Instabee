@@ -348,7 +348,7 @@ def competitor_presence(con, area: str, host_radius_m: float = 50) -> Result:
     a = resolve_area(con, area)
     lockers = con.execute(f"""SELECT l.network, count(*) AS lockers FROM lockers l
         JOIN deso d ON ST_Within(l.geom, d.geom) WHERE {a.where('d.kommun_code')}
-        GROUP BY 1 ORDER BY 2 DESC""").df()
+        GROUP BY 1 ORDER BY 2 DESC, 1""").df()
     hosts = con.execute(f"""SELECT {chain_sql('h.brand', 'h.name')} AS brand, l.network, count(DISTINCT h.host_id) AS sites
         FROM hosts h JOIN lockers l ON ST_DWithin(h.geom, l.geom, {float(host_radius_m)})
         WHERE {a.where('h.kommun_code')} AND h.host_type <> 'pickup_point'
@@ -358,7 +358,7 @@ def competitor_presence(con, area: str, host_radius_m: float = 50) -> Result:
               .reset_index() if not hosts.empty else pd.DataFrame(columns=["brand"]))
     if not chains.empty:
         chains["total"] = chains.drop(columns="brand").sum(axis=1)
-        chains = chains.sort_values("total", ascending=False).reset_index(drop=True)
+        chains = chains.sort_values(["total", "brand"], ascending=[False, True]).reset_index(drop=True)
     summary = {"area": a.name, "lockers_total": int(lockers.lockers.sum()) if len(lockers) else 0,
                "host_match_radius_m": host_radius_m, "chains_hosting_lockers": len(chains)}
     notes = [LOWER_BOUND_NOTE,
