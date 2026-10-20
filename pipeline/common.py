@@ -57,6 +57,7 @@ def http(method: str, url: str, *, retries: int = 3, timeout: int = 300, **kwarg
 def load_extensions(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("INSTALL spatial; LOAD spatial;")
     con.execute("INSTALL h3 FROM community; LOAD h3;")
+    con.execute("SET enable_progress_bar = false")
 
 
 def connect(read_only: bool = False, path: Path | str = DB_PATH) -> duckdb.DuckDBPyConnection:
