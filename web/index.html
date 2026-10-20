@@ -16,6 +16,8 @@
   --model-soft: #e2eff3;
   --call-soft: #f8ebdd;
   --bad: #b3261e;
+  --site: #2b8a3e;           /* proposed sites */
+  --rival: #c8372d;          /* other networks' lockers */
   --display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
   --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
@@ -23,12 +25,12 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0e151a; --panel: #151f26; --fg: #e5ecf0; --muted: #93a3ae; --line: #2c3a44;
-    --model: #57b9d8; --call: #f0a250; --model-soft: #12313c; --call-soft: #3a2a19; --bad: #f2867d; color-scheme: dark;
+    --model: #57b9d8; --call: #f0a250; --model-soft: #12313c; --call-soft: #3a2a19; --bad: #f2867d; --site: #5cc770; --rival: #f07a72; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0e151a; --panel: #151f26; --fg: #e5ecf0; --muted: #93a3ae; --line: #2c3a44;
-  --model: #57b9d8; --call: #f0a250; --model-soft: #12313c; --call-soft: #3a2a19; --bad: #f2867d; color-scheme: dark;
+  --model: #57b9d8; --call: #f0a250; --model-soft: #12313c; --call-soft: #3a2a19; --bad: #f2867d; --site: #5cc770; --rival: #f07a72; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -179,11 +181,11 @@ footer a { color: var(--model); }
         <div class="maphint" id="maphint">Scroll or pinch to zoom · drag to move · click a municipality to open it</div>
       </div>
       <div class="legend" id="legend-k" hidden>
-        <span><i class="sw" style="background: var(--model)"></i>homes within <b id="lg-r">500</b> m of a locker</span>
-        <span><i class="sw" style="background: var(--call)"></i>homes outside reach</span>
-        <span><i class="sw" style="background: var(--fg)"></i>Instabee locker</span>
-        <span><i class="sw" style="border: 1.5px solid var(--muted)"></i>other locker</span>
-        <span><i class="sw" style="background: var(--call); outline: 2px solid var(--panel)"></i>proposed site (numbered)</span>
+        <span><i class="sw" style="background: var(--model)"></i>homes within <b id="lg-r">500</b> m of <b id="lg-net-k">an Instabee</b> locker</span>
+        <span><i class="sw" style="background: var(--muted)"></i>homes without one nearby</span>
+        <span><i class="sw" style="background: var(--fg); border: 1px solid var(--line)"></i>Instabee locker</span>
+        <span><i class="sw" style="background: var(--rival)"></i>other locker</span>
+        <span><i class="sw" style="background: var(--site)"></i>proposed site (numbered)</span>
       </div>
       <div class="legend" id="legend-s">
         <span>Share of residents within 500 m of <b id="lg-net">Instabee</b> lockers</span>
@@ -392,6 +394,7 @@ Rules for the answer
     $("legend-k").hidden = s;
     $("lg-r").textContent = String(view.radius);
     $("lg-net").textContent = NET_LABEL[view.network] || view.network;
+    $("lg-net-k").textContent = { Instabee: "an Instabee", PostNord: "a PostNord", any: "any", competitors: "a competitor" }[view.network] || "a";
     if ([...$("m-net").options].some((o) => o.value === view.network)) $("m-net").value = view.network;
     $("maphint").textContent = s ? "Scroll or pinch to zoom · drag to move · click a municipality to open it"
       : "Scroll or pinch to zoom · drag to move · hover a pin for its name";
@@ -437,7 +440,8 @@ Rules for the answer
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, rect.width, rect.height);
     fit(rect.width, rect.height);
-    const c = { model: css("--model"), call: css("--call"), fg: css("--fg"), muted: css("--muted"), panel: css("--panel"), line: css("--line"), bg: css("--bg") };
+    const c = { model: css("--model"), call: css("--call"), fg: css("--fg"), muted: css("--muted"), panel: css("--panel"), line: css("--line"), bg: css("--bg"),
+      site: css("--site"), rival: css("--rival") };
     const labels = [];
     if (view.mode === "sweden") {
       const { key, max } = scale();
@@ -468,19 +472,20 @@ Rules for the answer
         const X = sx(h.x[i]), Y = sy(h.y[i]);
         if (X < -6 || Y < -6 || X > rect.width + 6 || Y > rect.height + 6) continue;
         const t = Math.sqrt(h.pop[i] / maxPop);
-        ctx.globalAlpha = 0.28 + 0.6 * t;
-        ctx.fillStyle = h.d[i] <= view.radius ? c.model : c.call;
+        const covered = h.d[i] <= view.radius;
+        ctx.globalAlpha = covered ? 0.35 + 0.6 * t : 0.18 + 0.42 * t;   // uncovered homes stay quiet
+        ctx.fillStyle = covered ? c.model : c.muted;
         ctx.beginPath(); ctx.arc(X, Y, Math.max(1.1, 0.5 + 3 * t) * grow, 0, 6.2832); ctx.fill();
       }
       ctx.globalAlpha = 1;
       for (const l of view.layer.lockers) {
         ctx.beginPath(); ctx.arc(sx(l.x), sy(l.y), 4, 0, 6.2832);
         if (l.network === "Instabee") { ctx.fillStyle = c.fg; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = c.panel; ctx.stroke(); }
-        else { ctx.lineWidth = 1.5; ctx.strokeStyle = c.muted; ctx.stroke(); }
+        else { ctx.fillStyle = c.rival; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = c.panel; ctx.stroke(); }
       }
       view.sites.forEach((st, i) => {
         const p = T.toSweref(st.lat, st.lon), X = sx(p.x), Y = sy(p.y);
-        ctx.beginPath(); ctx.arc(X, Y, 9, 0, 6.2832); ctx.fillStyle = c.call; ctx.fill();
+        ctx.beginPath(); ctx.arc(X, Y, 9, 0, 6.2832); ctx.fillStyle = c.site; ctx.fill();
         ctx.lineWidth = 2; ctx.strokeStyle = c.panel; ctx.stroke();
         ctx.fillStyle = c.panel; ctx.font = "600 10px 'IBM Plex Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText(String(i + 1), X, Y + 0.5);
