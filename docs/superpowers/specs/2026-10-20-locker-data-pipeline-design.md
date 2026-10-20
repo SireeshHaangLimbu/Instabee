@@ -85,15 +85,16 @@ characters of the DeSO code.
 **pop_grid_1km** — `cell_id, geom, population` plus the age-band columns as delivered.
 
 **hosts** — `host_id, overture_id, name, brand, category, host_type, lat, lon, geom, confidence`.
-`host_type` is one of `supermarket`, `convenience`, `fuel`, `pharmacy`, `mall`, mapped from
-Overture categories after inspecting that release's schema. Rows with confidence below 0.5 are dropped.
+`host_type` is one of `supermarket`, `convenience`, `fuel`, `pharmacy`, `mall`, or `pickup_point`
+(Overture `post_office`: competitor pickup points, not host candidates), mapped from `taxonomy.primary`. Rows with confidence below 0.5 are dropped.
 
 **buildings** — `lat, lon, footprint_m2` (centroids only), used to weight population.
 
 **hex_features** — one row per populated H3 resolution-9 cell.
-`h3, lat, lon, kommun_code, kommun_name, deso_code, pop_est, pop_20_34_est, pop_35_64_est,
+`h3, lat, lon, kommun_code, kommun_name, deso_code, pop_est, pop_0_19_est, pop_20_34_est, pop_35_64_est,
 pop_65_plus_est, dist_instabee_m, dist_any_competitor_m, dist_postnord_m, lockers_300m,
-lockers_500m, instabee_300m, instabee_500m, hosts_300m, supermarkets_300m, fuel_300m`.
+lockers_500m, instabee_300m, instabee_500m, hosts_300m, supermarkets_300m, fuel_300m,
+pickup_points_300m`.
 Population per cell: each 1 km cell's population and age bands are split across the hexes whose
 centre lies in it, weighted by building footprint area; with no buildings, the split is even.
 Distances use EPSG:3006 from the hex centre and are capped at 5,000 m (stored as 5000).
