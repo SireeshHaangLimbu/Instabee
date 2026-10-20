@@ -26,13 +26,17 @@ def _decimals(value: float) -> int:
 def _supported(value: float, pool: list[float]) -> bool:
     d = _decimals(value)
     for t in pool:
-        if round(t, d) == value or (t and abs(value - t) / abs(t) <= RELATIVE_TOLERANCE):
-            return True
+        for candidate in (t, t * 100 if 0 < t < 1 else None):  # 0.8 in a tool output = "80%" in prose
+            if candidate is None:
+                continue
+            if round(candidate, d) == value or (candidate and abs(value - candidate) / abs(candidate) <= RELATIVE_TOLERANCE):
+                return True
     return False
 
 
-def unsupported_numbers(answer: str, tool_outputs: list[str], question: str = "") -> list[float]:
-    pool = [n for text in tool_outputs for n in extract_numbers(text)]
+def unsupported_numbers(answer: str, tool_outputs: list[str], question: str = "", context: str = "") -> list[float]:
+    """Numbers in the answer found in neither the tool outputs nor the context the model was given."""
+    pool = [n for text in [*tool_outputs, context] for n in extract_numbers(text)]
     asked = set(extract_numbers(question))
     flagged = []
     for value in extract_numbers(answer):

@@ -22,6 +22,7 @@ cites its sources, and labels every estimate and data gap.
 | Placement algorithm | Greedy maximal covering on uncovered, age-weighted population (no solver dependency) | Greedy is within (1 − 1/e) of optimal and explainable in an interview |
 | Distances | Straight-line, from `hex_features` (EPSG:3006); radius ≤ 5,000 m | Matches the data pipeline |
 | Interfaces | CLI `python -m agent "question"`; a notebook mirroring the template | Template is notebook-first; CLI for quick checks |
+| Backends (added) | Default `claude-code`: the tools served over MCP (`agent/mcp_server.py`) to headless Claude Code on a Claude subscription; `api`: the Anthropic API loop | The API account had no credits; a subscription covers a proof of concept, and MCP also gives an interactive demo in Claude Code |
 | Maps | `render_map` writes a self-contained Leaflet HTML file to `outputs/` | No extra dependency |
 
 ## Tools exposed to the model

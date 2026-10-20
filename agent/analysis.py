@@ -288,7 +288,8 @@ def optimise_next_n(con, area: str, n: int = 5, network: str = "Instabee", radiu
     summary = {"area": a.name, "network": label, "radius_m": r, "candidates": candidates, "sites_chosen": len(table),
                "population": round(total), "pct_covered_before": round(100 * covered_before / total, 1),
                "pct_covered_after": round(100 * covered / total, 1),
-               "new_population_covered": round(covered - covered_before)}
+               # the sum of the rounded per-site figures, so the total matches the table exactly
+               "new_population_covered": int(table.new_population.sum()) if len(table) else 0}
     notes = _notes(label) + [
         "Greedy maximal covering on uncovered, age-weighted population: each pick adds the most demand not yet covered "
         "(within 1 - 1/e of the optimum).",
@@ -334,7 +335,9 @@ def peak_sizing(con, annual_locker_parcels: float, dwell_days: float = 2.0, util
     summary = {"annual_locker_parcels": annual_locker_parcels, "dwell_days": dwell_days, "utilisation": utilisation,
                "peak_month": month, "peak_month_share_pct": share[0],
                "parcels_per_day_average": round(avg_daily, 1), "parcels_per_day_peak": round(peak_daily, 1),
-               "compartments_average": size(avg_daily), "compartments_peak": size(peak_daily)}
+               "compartments_average": size(avg_daily), "compartments_peak": size(peak_daily),
+               "extra_compartments_for_peak": size(peak_daily) - size(avg_daily),
+               "peak_vs_average_pct": round(100 * (size(peak_daily) - size(avg_daily)) / size(avg_daily), 1)}
     notes = ["Seasonality is the national 2021-2025 monthly average from Paketindex; a single site can peak harder.",
              "Dwell time and target utilisation are assumptions; internal fill-rate and dwell data replace them.",
              "Days are spread evenly within the month; Black Friday and the week before Christmas peak higher."]

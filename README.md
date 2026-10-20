@@ -75,4 +75,7 @@ Maps are written to `outputs/`.
 bound. Add known lockers to `data/manual/own_lockers.csv` (`brand,name,lat,lon,address,note`) and rebuild with
 `python -m pipeline.run_all --skip-download`; they replace OSM lockers of the same network within 20 m.
 
-Designs: `docs/superpowers/specs/`.
+## Results
+
+8 of 8 eval questions pass (judge scores 4-5 of 5); see `docs/eval_results.md` for the table and what the evals
+changed. Designs: `docs/superpowers/specs/`.

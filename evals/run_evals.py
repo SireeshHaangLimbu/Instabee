@@ -17,6 +17,8 @@ from agent.claude_code import ClaudeCodeAgent, child_env, find_claude
 from agent.client import make_client
 from agent.loop import MODEL, LockerAgent
 from evals.cases import build_cases
+from agent.prompt import SYSTEM_PROMPT
+from agent.tools import TOOL_SPECS
 from evals.faithfulness import unsupported_numbers
 from pipeline.common import ROOT, connect
 
@@ -96,7 +98,8 @@ def main(argv: list[str] | None = None) -> int:
         result = agent.ask(case.question)
         verdict = (judge(client, case.question, case.reference, case.criteria, result.answer) if client
                    else judge_claude_code(case.question, case.reference, case.criteria, result.answer))
-        unsupported = unsupported_numbers(result.answer, [c["output"] for c in result.tool_calls], case.question)
+        unsupported = unsupported_numbers(result.answer, [c["output"] for c in result.tool_calls], case.question,
+                                          context=SYSTEM_PROMPT + json.dumps(TOOL_SPECS))  # what the model was told
         rows.append({"case": case.name, "backend": args.backend, "passed": verdict["passed"], "score": verdict["score"],
                      "unsupported_numbers": unsupported, "tool_calls": len(result.tool_calls),
                      "seconds": result.seconds, "input_tokens": result.usage.get("input_tokens", 0),

@@ -66,6 +66,7 @@ def test_optimise_next_n_greedy(mini_db):
     assert list(result.table.new_population) == pytest.approx([1500, 300])
     assert result.summary["pct_covered_before"] == pytest.approx(14.3, abs=0.05)
     assert result.summary["pct_covered_after"] == pytest.approx(100)
+    assert result.summary["new_population_covered"] == result.table.new_population.sum()
 
 
 def test_optimise_next_n_on_residential_hexes(mini_db):
@@ -90,6 +91,8 @@ def test_peak_sizing(mini_db):
     result = analysis.peak_sizing(mini_db, annual_locker_parcels=3650, dwell_days=2, utilisation=0.8, peak_month="dec")
     assert result.summary["compartments_average"] == 25
     assert result.summary["compartments_peak"] == 32  # 3650 * 10.6% / 31 * 2 / 0.8 = 31.2
+    assert result.summary["extra_compartments_for_peak"] == 7
+    assert result.summary["peak_vs_average_pct"] == 28.0
 
 
 def test_competitor_presence(mini_db):
