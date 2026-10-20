@@ -1,0 +1,29 @@
+metric,value,unit,period,geography,source_title,source_url,page
+ecommerce_parcels,256183415,parcels,2025,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,7
+ecommerce_parcels,69979000,parcels,2026-Q2,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,7
+ecommerce_parcels_growth_yoy,11.0,percent,2026-Q2,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,7
+domestic_parcels,176501424,parcels,2025,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,9
+foreign_parcels,79681991,parcels,2025,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,10
+foreign_parcel_share,32.4,percent,2026-Q2,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,3
+delivery_share_pickup_point,40,percent,2026-06,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,8
+delivery_share_home,37,percent,2026-06,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,8
+delivery_share_locker,23,percent,2026-06,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,8
+delivery_share_locker_indoor,13,percent,2026-06,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,8
+delivery_share_locker_outdoor,10,percent,2026-06,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,8
+delivery_survey_respondents,898,people,2026-06,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,8
+secondhand_parcels,8193000,parcels,2026-Q2,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,11
+secondhand_parcels_growth_yoy,36.3,percent,2026-Q2,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,11
+secondhand_parcels,25175525,parcels,2025,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,11
+return_rate,7.3,percent,2026-Q2,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,12
+seasonality_share_jan,8.1,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_feb,6.8,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_mar,7.8,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_apr,7.9,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_may,8.6,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_jun,8.0,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_jul,7.4,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_aug,8.0,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_sep,8.0,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_oct,8.6,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_nov,10.1,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
+seasonality_share_dec,10.6,percent of year,2021-2025 average,Sweden,Paketindex Q2 2026 (Transportföretagen),https://via.tt.se/files/3235972/4535013/411099/sv,14
