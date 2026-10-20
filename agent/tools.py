@@ -21,6 +21,7 @@ TABLE_DOCS = {
     "buildings": "Overture building centroids and footprint (used to place population)",
     "market_stats": "national figures from Paketindex Q2 2026: parcels per year, delivery mix, seasonality, second-hand",
     "sources": "every table's source, URL, licence and snapshot date",
+    "places": "SCB urban areas (tätorter) 2023: name, municipality, population and a label point",
 }
 AREA = {"type": "string", "description": "A Swedish municipality name such as 'Uppsala' or 'Göteborg', or 'Sweden'."}
 AREA_KOMMUN = {"type": "string", "description": "A Swedish municipality name such as 'Uppsala'."}

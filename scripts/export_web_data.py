@@ -67,6 +67,25 @@ def main() -> None:
     market = con.execute("SELECT metric, value, unit, period, source_title, source_url, page FROM market_stats").fetchall()
     sources = con.execute("SELECT table_name, source_title, url, licence, CAST(snapshot_date AS VARCHAR), row_count, notes FROM sources ORDER BY 1").fetchall()
 
+    shapes = {}
+    for code, geo in con.execute("""SELECT kommun_code, ST_AsGeoJSON(ST_SimplifyPreserveTopology(ST_Union_Agg(geom), 200))
+                                    FROM deso GROUP BY 1""").fetchall():
+        g = json.loads(geo)
+        polys = g["coordinates"] if g["type"] == "MultiPolygon" else [g["coordinates"]]
+        shapes[code] = [[[[round(x), round(y)] for x, y in ring] for ring in poly] for poly in polys]
+    places = con.execute("""SELECT name, kommun_code, population, round(x), round(y) FROM places
+                            WHERE population >= 200 ORDER BY population DESC""").fetchall()
+    stats = con.execute("""SELECT kommun_code, round(sum(pop_est)) AS pop,
+               round(100 * sum(pop_est) FILTER (WHERE dist_instabee_m <= 500) / sum(pop_est), 1) AS ib,
+               round(100 * sum(pop_est) FILTER (WHERE least(dist_instabee_m, dist_any_competitor_m) <= 500) / sum(pop_est), 1) AS any,
+               round(100 * sum(pop_est) FILTER (WHERE dist_postnord_m <= 500) / sum(pop_est), 1) AS pn
+        FROM hex_features WHERE kommun_code IS NOT NULL GROUP BY 1""").fetchall()
+    locker_counts = {}
+    for network, *_, kommun in lockers:
+        if kommun:
+            c = locker_counts.setdefault(kommun, {"Instabee": 0, "all": 0})
+            c["all"] += 1
+            c["Instabee"] += network == "Instabee"
     meta = {
         "layout": {"f32": F32, "u16": U16},
         "counties": files,
@@ -78,8 +97,13 @@ def main() -> None:
         "market_stats": [dict(zip(["metric", "value", "unit", "period", "source_title", "source_url", "page"], r)) for r in market],
         "sources": [dict(zip(["table", "source", "url", "licence", "snapshot_date", "rows", "notes"], r)) for r in sources],
         "totals": {"hexes": len(hexes), "population": round(float(hexes["pop"].sum()))},
+        "places": [[n, k, int(pop), int(x), int(y)] for n, k, pop, x, y in places],
+        "kommun_stats": {c: {"pop": int(pop), "cov_instabee": ib or 0, "cov_any": a or 0, "cov_postnord": pn or 0,
+                             "lockers_instabee": locker_counts.get(c, {}).get("Instabee", 0),
+                             "lockers_all": locker_counts.get(c, {}).get("all", 0)} for c, pop, ib, a, pn in stats},
     }
     (OUT / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    (OUT / "kommun_shapes.json").write_text(json.dumps(shapes, separators=(",", ":")), encoding="utf-8")
     (OUT / "lockers.json").write_text(json.dumps(lockers, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (OUT / "hosts.json").write_text(json.dumps(hosts, ensure_ascii=False, separators=(",", ":"), default=str), encoding="utf-8")
     total = sum(f.stat().st_size for f in OUT.iterdir())

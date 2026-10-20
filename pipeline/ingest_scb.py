@@ -16,6 +16,7 @@ WFS = "https://geodata.scb.se/geoserver/stat/wfs"
 PXWEB = "https://api.scb.se/OV0104/v1/doris/sv/ssd/BE/BE0101/BE0101Y/"
 DESO_LAYER = "stat:DeSO_2025"
 GRID_LAYER = "stat:befolkning_1km_2025"
+PLACES_LAYER = "stat:Tatorter_2023"  # urban areas (tätorter): names for map labels
 PAGE = 10_000
 SCB_LICENCE = "SCB open geodata and open data terms"
 
@@ -71,6 +72,7 @@ def _pxweb(table: str, snapshot: Path) -> None:
 def download(snapshot: Path) -> None:
     _wfs_pages(DESO_LAYER, snapshot, "deso")
     _wfs_pages(GRID_LAYER, snapshot, "grid")
+    _wfs_pages(PLACES_LAYER, snapshot, "tatort")
     _pxweb("FolkmDesoAldKon", snapshot)
     _pxweb("HushallDesoTyp", snapshot)
 
@@ -132,6 +134,20 @@ def load(con, snapshot: Path) -> None:
         SELECT rutid_scb AS cell_id, geom, coalesce(beftotalt, 0) AS population, COLUMNS('^ald')
         FROM ({_union_read(grid_files, '*')})"""
     )
+    place_files = sorted(snapshot.glob("tatort_*.geojson"))
+    if place_files:
+        con.execute(
+            f"""CREATE OR REPLACE TABLE places AS
+            WITH raw AS ({_union_read(place_files, 'tatortskod, tatort, kommun, bef, geom')}),
+                 p AS (SELECT *, ST_PointOnSurface(geom) AS pt FROM raw)
+            SELECT tatortskod AS place_code, tatort AS name, kommun AS kommun_code, bef AS population,
+                   ST_X(pt) AS x, ST_Y(pt) AS y,
+                   ST_Y(ST_Transform(pt, 'EPSG:3006', 'EPSG:4326', always_xy := true)) AS lat,
+                   ST_X(ST_Transform(pt, 'EPSG:3006', 'EPSG:4326', always_xy := true)) AS lon
+            FROM p"""
+        )
+        register_source(con, "places", "SCB tätorter 2023 (urban areas, WFS)", WFS, SCB_LICENCE, date,
+                        notes="Names and population of urban areas, used for map labels")
     register_source(con, "deso", "SCB DeSO 2025 boundaries (WFS)", WFS, SCB_LICENCE, date)
     register_source(con, "deso", "SCB PxWeb FolkmDesoAldKon + HushallDesoTyp", PXWEB, SCB_LICENCE, date)
     register_source(con, "pop_grid_1km", "SCB befolkning 1 km grid 2025 (WFS)", WFS, SCB_LICENCE, date)

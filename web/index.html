@@ -93,7 +93,22 @@ canvas { width: 100%; height: 100%; display: block; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.maptitle { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.maptitle { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+.maptools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.maptools select { width: auto; padding: 5px 8px; font-size: 13px; }
+button.sm { padding: 4px 10px; font-size: 13px; }
+.mapbox canvas { touch-action: none; cursor: grab; }
+.mapbox canvas.dragging { cursor: grabbing; }
+.mapbox canvas.pick { cursor: pointer; }
+.zoom { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; }
+.zoom button { background: var(--panel); min-width: 32px; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 9px; font-size: 12.5px; line-height: 1.4; max-width: 240px; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.tip b { font-weight: 600; }
+.maphint { position: absolute; left: 10px; bottom: 8px; right: 10px; font-size: 11.5px; color: var(--muted); pointer-events: none; }
+.sw.sq { border-radius: 2px; }
+.gradwrap { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.grad { display: inline-block; width: 110px; height: 10px; border-radius: 2px; }
 
 /* calculator */
 form.calc { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: end; }
@@ -143,16 +158,37 @@ footer a { color: var(--model); }
 
     <section class="panel" aria-labelledby="map-h">
       <div class="maptitle">
-        <h2 id="map-h">Map: <span id="maparea">Uppsala</span></h2>
-        <span class="label" id="mapnote">Instabee · 500 m</span>
+        <h2 id="map-h">Map: <span id="maparea">Sweden</span></h2>
+        <div class="maptools">
+          <button type="button" class="ghost sm" id="m-sweden" hidden>All of Sweden</button>
+          <select id="m-net" aria-label="Network shown on the map">
+            <option value="Instabee">Instabee lockers</option>
+            <option value="PostNord">PostNord lockers</option>
+            <option value="any">Any locker</option>
+          </select>
+        </div>
       </div>
-      <div class="mapbox"><canvas id="map" role="img" aria-label="Map of homes covered and not covered by lockers, with proposed sites"></canvas></div>
-      <div class="legend">
-        <span><i class="sw" style="background: var(--model)"></i>homes within reach</span>
+      <div class="mapbox" id="mapbox">
+        <canvas id="map" role="img" aria-label="Map of locker coverage: Sweden by municipality, or one municipality's homes, lockers and proposed sites"></canvas>
+        <div class="zoom" role="group" aria-label="Map zoom">
+          <button type="button" class="ghost sm" id="z-in" aria-label="Zoom in">+</button>
+          <button type="button" class="ghost sm" id="z-out" aria-label="Zoom out">−</button>
+          <button type="button" class="ghost sm" id="z-reset">Reset</button>
+        </div>
+        <div class="tip" id="tip" hidden></div>
+        <div class="maphint" id="maphint">Scroll or pinch to zoom · drag to move · click a municipality to open it</div>
+      </div>
+      <div class="legend" id="legend-k" hidden>
+        <span><i class="sw" style="background: var(--model)"></i>homes within <b id="lg-r">500</b> m of a locker</span>
         <span><i class="sw" style="background: var(--call)"></i>homes outside reach</span>
         <span><i class="sw" style="background: var(--fg)"></i>Instabee locker</span>
         <span><i class="sw" style="border: 1.5px solid var(--muted)"></i>other locker</span>
         <span><i class="sw" style="background: var(--call); outline: 2px solid var(--panel)"></i>proposed site (numbered)</span>
+      </div>
+      <div class="legend" id="legend-s">
+        <span>Share of residents within 500 m of <b id="lg-net">Instabee</b> lockers</span>
+        <span class="gradwrap"><span>0%</span><i class="grad" id="lg-grad"></i><span id="lg-max">20%</span></span>
+        <span><i class="sw sq" style="background: var(--panel); border: 1px solid var(--line)"></i>none mapped</span>
       </div>
 
       <h2>Calculator, no AI needed</h2>
@@ -294,69 +330,274 @@ Rules for the answer
     if (!["coverage", "coverage_gaps", "optimise_next_n", "score_sites"].includes(name)) return;
     let area;
     try { area = T.resolveArea(input.area); } catch { return; }
-    if (!area.code) return;
-    const sites = name === "optimise_next_n" ? (res.table || []).map((r) => ({ name: r.name, lat: r.lat, lon: r.lon })) : null;
-    drawMap(area.name, input.network || "Instabee", input.radius_m || 500, sites);
+    const network = input.network || "Instabee";
+    if (!area.code) { showSweden(network); return; }
+    const sites = name === "optimise_next_n" ? (res.table || []).map((r) => ({ name: r.name, type: r.host_type, lat: r.lat, lon: r.lon })) : null;
+    drawMap(area.name, network, input.radius_m || 500, sites);
   }
 
-  // ---------- map ----------
-  const canvas = $("map");
-  let lastMap = null;
+  // ---------- map: Sweden overview and municipality view, with zoom, pan, labels and tooltips ----------
+  const canvas = $("map"), tip = $("tip");
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-  async function drawMap(areaName, network, radius, sites) {
-    const layer = await T.mapLayer(areaName, network, radius);
-    lastMap = { layer, sites: sites ?? (lastMap && lastMap.layer.area === layer.area ? lastMap.sites : []) };
-    $("maparea").textContent = layer.area;
-    $("mapnote").textContent = `${layer.network} · ${layer.radius} m`;
-    paint();
+  const METRIC = { Instabee: "cov_instabee", PostNord: "cov_postnord", any: "cov_any", competitors: "cov_any" };
+  const NET_LABEL = { Instabee: "Instabee", PostNord: "PostNord", any: "any", competitors: "competitor" };
+  let G = null, base = null, frame = 0, swedenBox = null, hover = null;
+  const boxes = new Map();
+  const view = { mode: "sweden", code: null, name: "Sweden", network: "Instabee", radius: 500, layer: null, sites: [], k: 1, tx: 0, ty: 0, bbox: null };
+
+  function shapeBox(code) {
+    if (!boxes.has(code)) {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const poly of G.shapes[code]) for (const [x, y] of poly[0]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      boxes.set(code, [x0, y0, x1, y1]);
+    }
+    return boxes.get(code);
   }
+  function sweden() {
+    if (!swedenBox) {
+      swedenBox = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const code of Object.keys(G.shapes)) { const b = shapeBox(code); swedenBox = [Math.min(swedenBox[0], b[0]), Math.min(swedenBox[1], b[1]), Math.max(swedenBox[2], b[2]), Math.max(swedenBox[3], b[3])]; }
+    }
+    return swedenBox;
+  }
+  function fit(w, h) {
+    const [x0, y0, x1, y1] = view.bbox, pad = 0.05, bw = x1 - x0, bh = y1 - y0;
+    const s = Math.min(w / (bw * (1 + 2 * pad)), h / (bh * (1 + 2 * pad)));
+    base = { s, ox: (w - bw * s) / 2, oy: (h - bh * s) / 2, x0, y1, w, h };
+  }
+  const sx = (x) => (base.ox + (x - base.x0) * base.s) * view.k + view.tx;
+  const sy = (y) => (base.oy + (base.y1 - y) * base.s) * view.k + view.ty;
+  const wx = (X) => base.x0 + ((X - view.tx) / view.k - base.ox) / base.s;
+  const wy = (Y) => base.y1 - ((Y - view.ty) / view.k - base.oy) / base.s;
+  const resetZoom = () => { view.k = 1; view.tx = 0; view.ty = 0; };
+
+  function inShape(code, x, y) {
+    const b = shapeBox(code);
+    if (x < b[0] || x > b[2] || y < b[1] || y > b[3]) return false;
+    let inside = false;
+    for (const poly of G.shapes[code]) for (const ring of poly)
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i], [xj, yj] = ring[j];
+        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+      }
+    return inside;
+  }
+  const kommunAt = (X, Y) => { const x = wx(X), y = wy(Y); return Object.keys(G.shapes).find((c) => inShape(c, x, y)) || null; };
+
+  function ui() {
+    const s = view.mode === "sweden";
+    $("maparea").textContent = view.name;
+    $("m-sweden").hidden = s;
+    $("legend-s").hidden = !s;
+    $("legend-k").hidden = s;
+    $("lg-r").textContent = String(view.radius);
+    $("lg-net").textContent = NET_LABEL[view.network] || view.network;
+    if ([...$("m-net").options].some((o) => o.value === view.network)) $("m-net").value = view.network;
+    $("maphint").textContent = s ? "Scroll or pinch to zoom · drag to move · click a municipality to open it"
+      : "Scroll or pinch to zoom · drag to move · hover a pin for its name";
+  }
+
+  async function drawMap(areaName, network, radius, sites) {
+    G ??= await T.geo();
+    const net = network === "any network" ? "any" : network;
+    const layer = await T.mapLayer(areaName, net, radius);
+    const code = T.resolveArea(areaName).code, same = view.mode === "kommun" && view.code === code;
+    Object.assign(view, { mode: "kommun", code, name: layer.area, network: net, radius: layer.radius, layer,
+      sites: sites ?? (same ? view.sites : []), bbox: shapeBox(code) });
+    if (!same) resetZoom();
+    ui(); schedule();
+  }
+  async function showSweden(network) {
+    G ??= await T.geo();
+    Object.assign(view, { mode: "sweden", code: null, name: "Sweden", layer: null, sites: [], bbox: sweden() });
+    if (network && METRIC[network]) view.network = network;
+    resetZoom(); ui(); schedule();
+  }
+
+  const hexRgb = (h) => { const m = h.replace("#", ""); const v = parseInt(m.length === 3 ? m.replace(/./g, "$&$&") : m, 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
+  const mix = (a, b, t) => { const A = hexRgb(a), B = hexRgb(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",")})`; };
+  function path(ctx, polys) {
+    ctx.beginPath();
+    for (const poly of polys) for (const ring of poly) { ring.forEach(([x, y], i) => (i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y)))); ctx.closePath(); }
+  }
+  function scale() {
+    const key = METRIC[view.network] || "cov_instabee";
+    const vals = Object.values(G.stats).map((s) => s[key]).filter((v) => v > 0).sort((a, b) => a - b);
+    const p95 = vals.length ? vals[Math.floor(vals.length * 0.95)] : 5;
+    return { key, max: Math.max(5, Math.ceil(p95 / 5) * 5) };
+  }
+
   function paint() {
-    if (!lastMap) return;
-    const { layer, sites } = lastMap, h = layer.hexes;
+    frame = 0;
+    if (!G || !view.bbox) return;
     const rect = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, rect.width * dpr); canvas.height = Math.max(1, rect.height * dpr);
+    if (!rect.width || !rect.height) return;
+    canvas.width = Math.round(rect.width * dpr); canvas.height = Math.round(rect.height * dpr);
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, rect.width, rect.height);
-    // Fit the populated core: drop the 1% most remote hexagons so rural edges do not shrink the city.
-    const order = h.pop.map((p, i) => i).sort((a, b) => h.pop[b] - h.pop[a]);
-    const core = order.slice(0, Math.max(50, Math.floor(order.length * 0.6)));
-    const xs = core.map((i) => h.x[i]).sort((a, b) => a - b), ys = core.map((i) => h.y[i]).sort((a, b) => a - b);
-    const q = (arr, p) => arr[Math.floor((arr.length - 1) * p)];
-    let x0 = q(xs, 0.01), x1 = q(xs, 0.99), y0 = q(ys, 0.01), y1 = q(ys, 0.99);
-    const pad = 900; x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
-    const s = Math.min(rect.width / (x1 - x0), rect.height / (y1 - y0));
-    const ox = (rect.width - (x1 - x0) * s) / 2, oy = (rect.height - (y1 - y0) * s) / 2;
-    const px = (x) => ox + (x - x0) * s, py = (y) => oy + (y1 - y) * s;
-    const maxPop = h.pop.reduce((m, v) => Math.max(m, v), 1);
-    const cov = css("--model"), unc = css("--call"), fg = css("--fg"), muted = css("--muted"), panel = css("--panel");
-    for (let i = 0; i < h.x.length; i++) {
-      if (h.pop[i] < 1) continue;
-      ctx.globalAlpha = 0.25 + 0.6 * Math.sqrt(h.pop[i] / maxPop);
-      ctx.fillStyle = h.d[i] <= layer.radius ? cov : unc;
-      const r = Math.max(1.2, 0.5 + 3.2 * Math.sqrt(h.pop[i] / maxPop));
-      ctx.beginPath(); ctx.arc(px(h.x[i]), py(h.y[i]), r, 0, 6.2832); ctx.fill();
+    fit(rect.width, rect.height);
+    const c = { model: css("--model"), call: css("--call"), fg: css("--fg"), muted: css("--muted"), panel: css("--panel"), line: css("--line"), bg: css("--bg") };
+    const labels = [];
+    if (view.mode === "sweden") {
+      const { key, max } = scale();
+      $("lg-max").textContent = max + "%+";
+      $("lg-grad").style.background = `linear-gradient(90deg, ${mix(c.panel, c.model, 0.12)}, ${c.model})`;
+      for (const [code, polys] of Object.entries(G.shapes)) {
+        const v = G.stats[code]?.[key] || 0;
+        path(ctx, polys);
+        ctx.fillStyle = v > 0 ? mix(c.panel, c.model, 0.12 + 0.88 * Math.min(1, v / max) ** 0.75) : c.panel;
+        ctx.fill("evenodd");
+        ctx.lineWidth = code === hover ? 1.8 : 0.5; ctx.strokeStyle = code === hover ? c.fg : c.line; ctx.stroke();
+      }
+      const limit = Math.round(12 + 10 * view.k);
+      for (const [name, , pop, x, y] of G.places) { if (labels.length >= limit * 3) break; labels.push({ name, pop, x, y, dot: true }); }
+      drawLabels(ctx, c, labels, limit);
+    } else {
+      for (const [code, polys] of Object.entries(G.shapes)) {
+        const b = shapeBox(code);
+        if (sx(b[2]) < 0 || sx(b[0]) > rect.width || sy(b[1]) < 0 || sy(b[3]) > rect.height) continue;
+        path(ctx, polys);
+        if (code === view.code) { ctx.fillStyle = c.panel; ctx.fill("evenodd"); ctx.lineWidth = 1.4; ctx.strokeStyle = c.muted; }
+        else { ctx.lineWidth = 0.6; ctx.strokeStyle = c.line; }
+        ctx.stroke();
+      }
+      const h = view.layer.hexes, maxPop = h.pop.reduce((m, v) => Math.max(m, v), 1), grow = Math.min(3.5, Math.sqrt(view.k));
+      for (let i = 0; i < h.x.length; i++) {
+        if (h.pop[i] < 1) continue;
+        const X = sx(h.x[i]), Y = sy(h.y[i]);
+        if (X < -6 || Y < -6 || X > rect.width + 6 || Y > rect.height + 6) continue;
+        const t = Math.sqrt(h.pop[i] / maxPop);
+        ctx.globalAlpha = 0.28 + 0.6 * t;
+        ctx.fillStyle = h.d[i] <= view.radius ? c.model : c.call;
+        ctx.beginPath(); ctx.arc(X, Y, Math.max(1.1, 0.5 + 3 * t) * grow, 0, 6.2832); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      for (const l of view.layer.lockers) {
+        ctx.beginPath(); ctx.arc(sx(l.x), sy(l.y), 4, 0, 6.2832);
+        if (l.network === "Instabee") { ctx.fillStyle = c.fg; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = c.panel; ctx.stroke(); }
+        else { ctx.lineWidth = 1.5; ctx.strokeStyle = c.muted; ctx.stroke(); }
+      }
+      view.sites.forEach((st, i) => {
+        const p = T.toSweref(st.lat, st.lon), X = sx(p.x), Y = sy(p.y);
+        ctx.beginPath(); ctx.arc(X, Y, 9, 0, 6.2832); ctx.fillStyle = c.call; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = c.panel; ctx.stroke();
+        ctx.fillStyle = c.panel; ctx.font = "600 10px 'IBM Plex Mono', monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String(i + 1), X, Y + 0.5);
+      });
+      const limit = Math.round(10 + 8 * view.k);
+      for (const [name, , pop, x, y] of G.places) {
+        const X = sx(x), Y = sy(y);
+        if (X < 0 || Y < 0 || X > rect.width || Y > rect.height) continue;
+        labels.push({ name, pop, x, y, dot: false });
+        if (labels.length >= limit * 3) break;
+      }
+      drawLabels(ctx, c, labels, limit);
     }
-    ctx.globalAlpha = 1;
-    for (const l of layer.lockers) {
-      ctx.beginPath(); ctx.arc(px(l.x), py(l.y), 3.6, 0, 6.2832);
-      if (l.network === "Instabee") { ctx.fillStyle = fg; ctx.fill(); } else { ctx.strokeStyle = muted; ctx.lineWidth = 1.4; ctx.stroke(); }
-    }
-    (sites || []).forEach((st, i) => {
-      const p = T.toSweref(st.lat, st.lon), cx = px(p.x), cy = py(p.y);
-      ctx.beginPath(); ctx.arc(cx, cy, 9, 0, 6.2832); ctx.fillStyle = unc; ctx.fill();
-      ctx.lineWidth = 2; ctx.strokeStyle = panel; ctx.stroke();
-      ctx.fillStyle = panel; ctx.font = "600 10px IBM Plex Mono, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(String(i + 1), cx, cy + 0.5);
-    });
   }
-  new ResizeObserver(() => paint()).observe(canvas);
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", paint);
-  new MutationObserver(paint).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  function drawLabels(ctx, c, labels, limit) {
+    const taken = [];
+    let shown = 0;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    for (const l of labels) {
+      if (shown >= limit) break;
+      const size = l.pop >= 100000 ? 13.5 : l.pop >= 20000 ? 12.5 : 11.5, weight = l.pop >= 20000 ? 700 : 500;
+      ctx.font = `${weight} ${size}px 'IBM Plex Sans', system-ui, sans-serif`;
+      const X = sx(l.x), Y = sy(l.y) - (l.dot ? 10 : 0), w = ctx.measureText(l.name).width + 6, hgt = size + 4;
+      const r = [X - w / 2, Y - hgt / 2, X + w / 2, Y + hgt / 2];
+      if (r[0] < 2 || r[2] > base.w - 2 || r[1] < 2 || r[3] > base.h - 2) continue;
+      if (taken.some((t) => r[0] < t[2] && r[2] > t[0] && r[1] < t[3] && r[3] > t[1])) continue;
+      taken.push(r); shown++;
+      if (l.dot) { ctx.beginPath(); ctx.arc(X, Y + 10, 2.4, 0, 6.2832); ctx.fillStyle = c.fg; ctx.fill(); }
+      ctx.lineWidth = 3.5; ctx.strokeStyle = c.panel; ctx.strokeText(l.name, X, Y);
+      ctx.fillStyle = c.fg; ctx.fillText(l.name, X, Y);
+    }
+  }
+
+  function schedule() { if (!frame) frame = requestAnimationFrame(paint); }
+  function zoomAt(X, Y, f) {
+    const k2 = Math.min(80, Math.max(1, view.k * f)), ratio = k2 / view.k;
+    view.tx = X - (X - view.tx) * ratio; view.ty = Y - (Y - view.ty) * ratio; view.k = k2;
+    if (k2 === 1) { view.tx = 0; view.ty = 0; }
+    schedule();
+  }
+  const fmtN = (n) => Number(n).toLocaleString("en-GB");
+  function showTip(X, Y, html) {
+    if (!html) { tip.hidden = true; return; }
+    tip.innerHTML = html; tip.hidden = false;
+    const bw = canvas.clientWidth, bh = canvas.clientHeight, tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = Math.min(bw - tw - 6, X + 14) + "px"; tip.style.top = Math.min(bh - th - 6, Math.max(6, Y + 14)) + "px";
+  }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+  function hoverAt(X, Y) {
+    if (!G || !base) return;
+    if (view.mode === "sweden") {
+      const code = kommunAt(X, Y);
+      if (code !== hover) { hover = code; schedule(); }
+      canvas.classList.toggle("pick", !!code);
+      if (!code) return showTip(X, Y, "");
+      const st = G.stats[code] || {}, k = G.kommuner.find((m) => m.code === code), key = METRIC[view.network];
+      return showTip(X, Y, `<b>${esc(k?.name || code)}</b><br>${st[key] ?? 0}% of ${fmtN(st.pop || 0)} residents within 500 m of ${esc(NET_LABEL[view.network])} lockers<br>${st.lockers_instabee || 0} Instabee · ${st.lockers_all || 0} lockers mapped`);
+    }
+    let best = null, bd = 12;
+    view.sites.forEach((st, i) => { const p = T.toSweref(st.lat, st.lon), d = Math.hypot(sx(p.x) - X, sy(p.y) - Y); if (d < bd) { bd = d; best = `<b>${i + 1}. ${esc(st.name)}</b>${st.type ? "<br>" + esc(st.type) : ""}<br>proposed site`; } });
+    if (!best) for (const l of view.layer?.lockers || []) { const d = Math.hypot(sx(l.x) - X, sy(l.y) - Y); if (d < 8 && d < bd) { bd = d; best = `<b>${esc(l.network)}</b> locker${l.name ? "<br>" + esc(l.name) : ""}`; } }
+    showTip(X, Y, best || "");
+  }
+
+  const pointers = new Map();
+  let moved = false, pinch = null;
+  canvas.addEventListener("pointerdown", (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+    moved = false; canvas.classList.add("dragging"); showTip(0, 0, "");
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return hoverAt(e.offsetX, e.offsetY);
+    if (pointers.size === 1) {
+      const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
+      if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+      view.tx += dx; view.ty += dy; schedule();
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()], d0 = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      p.x = e.offsetX; p.y = e.offsetY;
+      const [a2, b2] = [...pointers.values()], d1 = Math.hypot(a2.x - b2.x, a2.y - b2.y) || 1;
+      zoomAt((a2.x + b2.x) / 2, (a2.y + b2.y) / 2, d1 / d0); moved = true; pinch = true;
+      return;
+    }
+    p.x = e.offsetX; p.y = e.offsetY;
+  });
+  const release = (e) => {
+    const wasClick = pointers.size === 1 && !moved && !pinch;
+    pointers.delete(e.pointerId);
+    if (!pointers.size) { canvas.classList.remove("dragging"); pinch = null; }
+    if (wasClick && e.type === "pointerup" && view.mode === "sweden") {
+      const code = kommunAt(e.offsetX, e.offsetY);
+      if (code) { const k = G.kommuner.find((m) => m.code === code); $("c-area").value = k.name; runCalc(); }
+    }
+  };
+  canvas.addEventListener("pointerup", release);
+  canvas.addEventListener("pointercancel", release);
+  canvas.addEventListener("pointerleave", () => { if (!pointers.size) { showTip(0, 0, ""); if (hover) { hover = null; schedule(); } } });
+  canvas.addEventListener("wheel", (e) => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  canvas.addEventListener("dblclick", (e) => zoomAt(e.offsetX, e.offsetY, 2));
+  $("z-in").addEventListener("click", () => zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1.6));
+  $("z-out").addEventListener("click", () => zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1 / 1.6));
+  $("z-reset").addEventListener("click", () => { resetZoom(); schedule(); });
+  $("m-sweden").addEventListener("click", () => showSweden(view.network));
+  $("m-net").addEventListener("change", () => {
+    const net = $("m-net").value;
+    if (view.mode === "sweden") { view.network = net; ui(); schedule(); } else drawMap(view.name, net, view.radius, view.sites);
+  });
+  new ResizeObserver(schedule).observe(canvas);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", schedule);
+  new MutationObserver(schedule).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
   // ---------- calculator ----------
   const fmt = (n) => Number(n).toLocaleString("en-GB");
-  async function runCalc() {
+  async function runCalc(draw = true) {
     const area = $("c-area").value, n = Math.min(50, Math.max(1, Number($("c-n").value) || 10));
     const radius_m = Number($("c-r").value), network = $("c-net").value;
     const kpis = $("kpis").querySelectorAll("b");
@@ -375,7 +616,7 @@ Rules for the answer
         }
         return tr;
       }));
-      await drawMap(area, network, radius_m, res.table.map((r) => ({ name: r.name, lat: r.lat, lon: r.lon })));
+      if (draw) await drawMap(area, network, radius_m, res.table.map((r) => ({ name: r.name, type: r.host_type, lat: r.lat, lon: r.lon })));
     } catch (e) {
       kpis.forEach((b) => (b.textContent = "–"));
       $("sites").querySelector("tbody").replaceChildren();
@@ -437,7 +678,7 @@ Rules for the answer
     b.addEventListener("click", () => { $("q").value = q; $("q").focus(); });
     $("chips").append(b);
   }
-  $("calc").addEventListener("change", runCalc);
+  $("calc").addEventListener("change", () => runCalc());
   $("calc").addEventListener("submit", (e) => { e.preventDefault(); runCalc(); });
 
   (async () => {
@@ -446,7 +687,8 @@ Rules for the answer
     const list = [...T.municipalities()].sort((a, b) => a.name.localeCompare(b.name, "sv"));
     for (const k of list) { const o = document.createElement("option"); o.value = k.name; o.textContent = k.name; sel.append(o); }
     sel.value = "Uppsala";
-    runCalc();
+    await showSweden("Instabee");   // open on the national picture
+    runCalc(false);                 // fill the calculator without leaving the overview
   })().catch((e) => setStatus("Could not load the data: " + (e.message || e), true));
 
   (async () => {

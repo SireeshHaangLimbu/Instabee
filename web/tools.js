@@ -362,7 +362,14 @@
       return { area: a.name, radius: r, network: net.label, hexes: hx, lockers: lockers.filter((l) => l.kommun === a.code) };
     }
 
-    return { init, resolveArea, toSweref, mapLayer, municipalities: () => kList,
+    let shapesPromise = null;
+    async function geo() {
+      await init();
+      shapesPromise ??= loader.json("kommun_shapes.json");
+      return { shapes: await shapesPromise, places: meta.places, stats: meta.kommun_stats, kommuner: kList };
+    }
+
+    return { init, resolveArea, toSweref, mapLayer, geo, municipalities: () => kList,
       tools: { coverage, coverage_gaps, demand_estimate, score_sites, optimise_next_n, overlap_check, peak_sizing, competitor_presence, data_sources } };
   }
 
