@@ -224,7 +224,9 @@ footer a { color: var(--model); }
           <option value="hosts">Retail hosts (shops, petrol, pharmacies)</option>
           <option value="hexes">Residential areas</option>
           <option value="both" selected>Both, mixed</option>
-        </select></label>      </form>
+        </select></label>
+        <label for="c-min">Min. parcels a year per locker<input id="c-min" type="number" min="0" step="1000" value="10000"></label>
+      </form>
       <div class="kpis" id="kpis">
         <div class="kpi"><b>…</b><span>covered today</span></div>
         <div class="kpi up"><b>…</b><span>after new lockers</span></div>
@@ -234,11 +236,13 @@ footer a { color: var(--model); }
         <div class="hm-head">
           <h3>How many lockers?</h3>
           <span id="hm-suggest" class="hm-suggest"></span>
+          <button type="button" class="ghost sm" id="hm-use" hidden>Use this number</button>
         </div>
-        <p class="hm-note">New residents each extra locker would reach, in the order the tool picks them. The best spots go first, so every extra locker reaches fewer new people than the one before.</p>
+        <p class="hm-note">Residents each extra locker would add, in the order the tool picks them. Each pick adds fewer people than the one before, so stop where a new locker no longer clears the parcel cut-off.</p>
         <div class="chartwrap"><svg id="hm-chart" role="img" aria-label="Residents added by each additional locker"></svg><div class="tip" id="hm-tip" hidden></div></div>
         <div class="legend">
-          <span><i class="sw sq" style="background: var(--site)"></i>new residents reached by that locker</span>
+          <span><i class="sw sq" style="background: var(--site)"></i>clears the cut-off</span>
+          <span><i class="sw sq" style="border: 1.5px solid var(--site)"></i>below it</span>
           <span><i class="mk"></i>your number of lockers</span>
         </div>
       </div>
@@ -298,7 +302,7 @@ How to work
 - For "where should the next N lockers go": coverage for the baseline and optimise_next_n for the sites in one round, then overlap_check on the top site.
 - If a tool returns an error, correct the call once; never guess a result.
 - Site types: in optimise_next_n results, host_type "residential" is a spot inside a housing area (suits a residential locker, such as Instabee's solar residential lockers); every other type is a retail host (supermarket, petrol station, pharmacy, convenience store, mall). When the question mentions residential or non-residential sites, use candidates "both" and group the answer by type.
-- If the question does not say how many lockers, run optimise_next_n with n 10, say that 10 is a default, and note how much fewer new residents the later sites reach than the first.
+- If the question does not say how many lockers, run optimise_next_n with n 30 and suggest the number of sites whose new_locker_parcels_est is at least 10,000 a year. Say that cut-off is an assumption the planner can change.
 
 Rules for the answer
 1. State no number that did not come from a tool result. No arithmetic beyond rounding, and no hypothetical values; for a what-if, call the tool again with that parameter.
@@ -657,6 +661,7 @@ Rules for the answer
   async function runCalc(draw = true) {
     const area = $("c-area").value, n = Math.min(50, Math.max(1, Number($("c-n").value) || 10));
     const radius_m = Number($("c-r").value), network = $("c-net").value, candidates = $("c-type").value;
+    const minParcels = Math.max(0, Number($("c-min").value) || 0);
     const kpis = $("kpis").querySelectorAll("b");
     kpis.forEach((b) => (b.textContent = "…"));
     try {
@@ -676,7 +681,7 @@ Rules for the answer
         }
         return tr;
       }));
-      curve = { rows: all, n, area: s.area };
+      curve = { rows: all, n, minParcels, area: s.area };
       drawCurve();
       if (draw) await drawMap(area, network, radius_m, rows.map((r) => ({ name: r.name, type: r.host_type, lat: r.lat, lon: r.lon })));
     } catch (e) {
@@ -692,8 +697,8 @@ Rules for the answer
   }
   function drawCurve() {
     const svg = $("hm-chart");
-    if (!curve || !curve.rows.length) { svg.innerHTML = ""; $("hm-suggest").textContent = ""; return; }
-    const { rows, n, area } = curve, m = rows.length;
+    if (!curve || !curve.rows.length) { svg.innerHTML = ""; $("hm-suggest").textContent = ""; $("hm-use").hidden = true; return; }
+    const { rows, n, minParcels, area } = curve, m = rows.length;
     const W = 560, H = 196, L = 46, R = 10, TOP = 24, B = 26, pw = W - L - R, ph = H - TOP - B;
     const maxV = Math.max(...rows.map((r) => r.new_population)), step = niceStep(maxV / 3), top = Math.ceil(maxV / step) * step;
     const slot = pw / m, bw = Math.max(2, slot - 2), y = (v) => TOP + ph - (v / top) * ph;
@@ -704,7 +709,8 @@ Rules for the answer
     }
     rows.forEach((r, i) => {
       const x = L + i * slot + (slot - bw) / 2, h = (r.new_population / top) * ph, yt = TOP + ph - h, rr = Math.min(3, bw / 2, h);
-      out += `<path class="bar" data-i="${i}" d="M${x},${TOP + ph} L${x},${yt + rr} Q${x},${yt} ${x + rr},${yt} L${x + bw - rr},${yt} Q${x + bw},${yt} ${x + bw},${yt + rr} L${x + bw},${TOP + ph} Z"/>`;
+      const below = minParcels > 0 && r.new_locker_parcels_est < minParcels;
+      out += `<path class="bar${below ? " below" : ""}" data-i="${i}" d="M${x},${TOP + ph} L${x},${yt + rr} Q${x},${yt} ${x + rr},${yt} L${x + bw - rr},${yt} Q${x + bw},${yt} ${x + bw},${yt + rr} L${x + bw},${TOP + ph} Z"/>`;
     });
     for (const k of [1, 10, 20, 30, 40]) if (k <= m) out += `<text class="axis" x="${L + (k - 0.5) * slot}" y="${H - 8}" text-anchor="middle">${k}</text>`;
     out += `<text class="axis" x="${L}" y="12">residents added</text><text class="axis" x="${W - R}" y="${H - 8}" text-anchor="end">locker #</text>`;
@@ -716,8 +722,14 @@ Rules for the answer
     rows.forEach((r, i) => { out += `<rect class="hit" data-i="${i}" x="${L + i * slot}" y="${TOP}" width="${slot}" height="${ph}"/>`; });
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.innerHTML = out;
-    const at = (k) => rows[Math.min(k, m) - 1].new_population;
-    $("hm-suggest").innerHTML = `In <b>${area}</b>, locker 1 reaches <b>${fmt(at(1))}</b> new residents, locker ${Math.min(n, m)} reaches <b>${fmt(at(n))}</b> and locker ${m} only <b>${fmt(at(m))}</b>.`;
+    const clears = rows.filter((r) => r.new_locker_parcels_est >= minParcels).length;
+    const sug = $("hm-suggest"), use = $("hm-use");
+    if (minParcels <= 0) { sug.textContent = "Set a minimum parcels figure to get a suggested number."; use.hidden = true; return; }
+    const many = clears >= m ? `${m} or more` : String(clears);
+    sug.innerHTML = `At ${fmt(minParcels)}+ estimated parcels a year per locker, <b>${area}</b> supports about <b>${many}</b> new lockers. You chose <b>${n}</b>.`;
+    use.hidden = clears === n || clears === 0;
+    use.textContent = `Use ${Math.min(clears, 50)}`;
+    use.dataset.n = String(Math.min(clears, 50));
   }
   (() => {
     const svg = $("hm-chart"), tipEl = $("hm-tip"), wrap = svg.parentElement;
@@ -734,6 +746,8 @@ Rules for the answer
       tipEl.style.top = Math.max(4, yy - tipEl.offsetHeight - 10) + "px";
     });
     svg.addEventListener("pointerleave", () => { tipEl.hidden = true; hot?.classList.remove("hot"); hot = null; });
+    $("hm-use").addEventListener("click", (e) => { $("c-n").value = e.currentTarget.dataset.n; runCalc(); });
+    $("c-min").addEventListener("input", () => { if (curve) { curve.minParcels = Math.max(0, Number($("c-min").value) || 0); drawCurve(); } });
   })();
 
   // ---------- ask ----------
