@@ -820,8 +820,10 @@ Rules for the answer
   (async () => {
     sample = window.claude ? await window.claude.use("sample") : null;
     if (!sample) {
+      // Outside claude.ai (e.g. the public GitHub Pages copy) there is no Claude to ask: point to the Claude version.
       $("ask").disabled = true;
-      setStatus("Open this page on claude.ai while signed in to ask Claude. The calculator works for everyone.");
+      $("status").innerHTML = 'AI questions work in the <a href="https://claude.ai/artifact/4PAzaqTvH9pDG3eda8zy8B" target="_blank" rel="noopener">Claude version of this page</a> for anyone signed in to Claude. The map and calculator here work for everyone.';
+      $("answer").textContent = "This public copy runs the map and calculator only. Every number below is computed in your browser from the same public data the AI agent uses.";
       return;
     }
     const lim = await sample.limits().catch(() => null);
