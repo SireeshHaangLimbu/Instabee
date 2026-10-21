@@ -55,7 +55,7 @@ h2 { font-family: var(--display); font-weight: 700; font-size: 17px; margin: 0; 
 .lede { margin: 0; max-width: 72ch; color: var(--muted); }
 .lede b { color: var(--fg); font-weight: 600; }
 
-.desk { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.desk { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
 @media (max-width: 900px) { .desk { grid-template-columns: minmax(0, 1fr); } }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
 
@@ -163,12 +163,11 @@ footer a { color: var(--model); }
   <header>
     <span class="label">Public-data prototype · Swedish parcel lockers</span>
     <h1>Locker Placement Desk</h1>
-    <p class="lede">Ask where new Instabox and Budbee lockers should go. Claude reads the question and calls planning tools that run
-      <b>in this page</b> on OpenStreetMap, SCB and Overture data for all of Sweden. Every number comes from those tools.</p>
+    <p class="lede">See where Instabox and Budbee lockers reach people today and where new ones would reach the most. Every number is computed <b>in your browser</b> from OpenStreetMap, SCB, Overture and Paketindex data for all of Sweden.</p>
   </header>
 
   <div class="desk">
-    <section class="panel" aria-labelledby="ask-h">
+    <section class="panel" aria-labelledby="ask-h" hidden>
       <h2 id="ask-h">Ask the agent</h2>
       <div class="askrow">
         <textarea id="q" aria-label="Your question">Where should Instabox put its next 10 lockers in Uppsala?</textarea>
@@ -222,7 +221,10 @@ footer a { color: var(--model); }
         <span><i class="sw sq" style="background: var(--panel); border: 1px solid var(--line)"></i>none mapped</span>
       </div>
 
-      <h2>Calculator, no AI needed</h2>
+    </section>
+
+    <section class="panel" aria-labelledby="calc-h">
+      <h2 id="calc-h">Calculator</h2>
       <form class="calc" id="calc">
         <label for="c-area">Municipality<select id="c-area"></select></label>
         <label for="c-n">New lockers<input id="c-n" type="number" min="1" max="50" value="10"></label>
