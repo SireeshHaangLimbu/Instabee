@@ -192,7 +192,7 @@
           ecommerce_parcels_per_year: round(parcels), locker_share_pct: round(share * 100, 1), locker_parcels_per_year: round(parcels * share) },
         notes: [
           `Estimate, not a measurement: Sweden's ${p.parcels_period} e-commerce parcels (Paketindex) divided by population gives ${p.parcels_per_person.toFixed(1)} parcels per person per year.`,
-          `Age weights are placeholders, not fitted to data (relative to the national average): ${w}.`,
+          `Age weights (relative to the national average) come from SCB's 2025 survey of how often each age group buys online: ${w}.`,
           `Locker share ${Math.round(share * 100)}% is the national June 2026 figure (Paketindex survey); local shares differ.`,
           "Internal checkout and delivery-address data would replace every one of these assumptions.", POPULATION_NOTE],
       };

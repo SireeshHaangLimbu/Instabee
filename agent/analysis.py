@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 import math
+from pathlib import Path
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -18,7 +20,17 @@ NETWORKS = {
     "competitors": ("dist_any_competitor_m", "competitors", "network <> 'Instabee'"),
     "any": ("least(dist_instabee_m, dist_any_competitor_m)", "any network", "TRUE"),
 }
-AGE_WEIGHTS = {"pop_0_19": 0.4, "pop_20_34": 1.4, "pop_35_64": 1.2, "pop_65_plus": 0.6}
+AGE_WEIGHTS_CSV = Path(__file__).resolve().parents[1] / "data" / "manual" / "age_weights.csv"
+
+
+def _load_age_weights() -> dict[str, float]:
+    """Online purchases per person per 3 months by age band, from SCB's 2025 survey
+    (scripts/derive_age_weights.py). Only the ratios matter: demand_parameters rescales them."""
+    with open(AGE_WEIGHTS_CSV, encoding="utf-8") as f:
+        return {row["band"]: float(row["purchases_per_person_3_months"]) for row in csv.DictReader(f)}
+
+
+AGE_WEIGHTS = _load_age_weights()
 CANDIDATE_HOST_TYPES = ("supermarket", "convenience", "fuel", "pharmacy", "mall")
 MONTH_DAYS = {"jan": 31, "feb": 28, "mar": 31, "apr": 30, "may": 31, "jun": 30,
               "jul": 31, "aug": 31, "sep": 30, "oct": 31, "nov": 30, "dec": 31}
@@ -109,7 +121,7 @@ def demand_estimate(con, area: str, locker_share: float | None = None) -> Result
     notes = [
         f"Estimate, not a measurement: Sweden's {p['parcels_period']} e-commerce parcels (Paketindex) divided by population "
         f"gives {p['parcels_per_person']:.1f} parcels per person per year.",
-        f"Age weights are placeholders, not fitted to data (relative to the national average): {weights}.",
+        f"Age weights (relative to the national average) come from SCB's 2025 survey of how often each age group buys online: {weights}.",
         f"Locker share {share * 100:.0f}% is the national June 2026 figure (Paketindex survey); local shares differ.",
         "Internal checkout and delivery-address data would replace every one of these assumptions.",
         POPULATION_NOTE,

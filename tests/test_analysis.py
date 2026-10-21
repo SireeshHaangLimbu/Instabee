@@ -50,7 +50,7 @@ def test_demand_estimate(mini_db):
     assert result.summary["parcels_per_person"] == pytest.approx(10)
     assert result.summary["ecommerce_parcels_per_year"] == pytest.approx(21000)
     assert result.summary["locker_parcels_per_year"] == pytest.approx(4830)
-    assert any("placeholder" in note for note in result.notes)
+    assert any("SCB's 2025 survey" in note for note in result.notes)
 
 
 def test_score_sites_ranks_by_uncovered_population(mini_db):

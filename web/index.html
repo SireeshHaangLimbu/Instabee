@@ -114,6 +114,7 @@ button.sm { padding: 4px 10px; font-size: 13px; }
 
 /* calculator */
 form.calc { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.hint { font-size: 11.5px; line-height: 1.35; color: var(--muted); }
 .howmany { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
 .hm-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
 .hm-head h3 { font-family: var(--display); font-size: 15px; font-weight: 700; margin: 0; }
@@ -225,7 +226,8 @@ footer a { color: var(--model); }
           <option value="hexes">Residential areas</option>
           <option value="both" selected>Both, mixed</option>
         </select></label>
-        <label for="c-min">Min. parcels a year per locker<input id="c-min" type="number" min="0" step="1000" value="10000"></label>
+        <label for="c-min">Break-even: parcels a year per locker<input id="c-min" type="number" min="0" step="1000" value="10000">
+          <small class="hint">A new locker is only worth building if it would get at least this many parcels a year. Used to suggest how many to build.</small></label>
       </form>
       <div class="kpis" id="kpis">
         <div class="kpi"><b>…</b><span>covered today</span></div>
