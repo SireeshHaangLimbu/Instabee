@@ -16,8 +16,29 @@ RESET = (":root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padd
          "body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}")
 
 
+def public_layout(page: str) -> str:
+    """The public copy has no AI: hide the ask panel (kept in the DOM so the shared script runs unchanged),
+    and split the map and the calculator into two full-height columns."""
+    swaps = [
+        ('<section class="panel" aria-labelledby="ask-h">', '<section class="panel" aria-labelledby="ask-h" hidden>'),
+        ('      <h2>Calculator, no AI needed</h2>',
+         '    </section>\n\n    <section class="panel" aria-labelledby="calc-h">\n      <h2 id="calc-h">Calculator</h2>'),
+        ('<p class="lede">Ask where new Instabox and Budbee lockers should go. Claude reads the question and calls planning tools that run\n'
+         '      <b>in this page</b> on OpenStreetMap, SCB and Overture data for all of Sweden. Every number comes from those tools.</p>',
+         '<p class="lede">See where Instabox and Budbee lockers reach people today and where new ones would reach the most. '
+         'Every number is computed <b>in your browser</b> from OpenStreetMap, SCB, Overture and Paketindex data for all of Sweden.</p>'),
+        ('.desk { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);',
+         '.desk { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);'),
+    ]
+    for old, new in swaps:
+        if old not in page:
+            raise ValueError(f"layout anchor not found: {old[:60]!r}")
+        page = page.replace(old, new, 1)
+    return page
+
+
 def main() -> None:
-    page = (WEB / "index.html").read_text(encoding="utf-8")
+    page = public_layout((WEB / "index.html").read_text(encoding="utf-8"))
     split = page.index("<style>")
     head_tags, body = page[:split], page[split:]
     html = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
